@@ -285,10 +285,13 @@ class xSVMC(SVC):
 
         return xIFSElements
 
-    def __sort_fn(self, e):
+    def __sort_votes(self, e):
         return e[1]
 
-    def predict_with_context(self, X):
+    def __sort_buoyancy(self, e):
+        return e[1].buoyancy
+
+    def predict_with_context_by_voting(self, X):
         """Performs an augmented prediction of the top-K classes for the sample X 
         
         Parameters
@@ -315,38 +318,117 @@ class xSVMC(SVC):
 
         votes = [0 for c in range(len(cs))]
         evals = [xAIFSElement() for c in range(len(cs))]
+        misvs = [xAIFSElement() for c in range(len(cs))]
 
         p = 0
         for i in range(len(cs)):
             for j in range(i+1,len(cs)):
                 if ifselements[p].buoyancy > 0: # pro_i 
                     votes[i]+=1
-                else: # pro_j 
-                    votes[j]+=1
+                else: 
+                    if ifselements[p].buoyancy < 0: # pro_j 
+                        votes[j]+=1
 
-                if ifselements[p].mu_hat.value >= evals[i].mu_hat.value:
-                    evals[i].mu_hat = ifselements[p].mu_hat
-                if ifselements[p].nu_hat.value >= evals[i].nu_hat.value:
-                    evals[i].nu_hat = ifselements[p].nu_hat
+                # pro_i 
+                evals[i].mu_hat.value += ifselements[p].mu_hat.value
+                evals[i].nu_hat.value += ifselements[p].nu_hat.value
+                # pro_j
+                evals[j].mu_hat.value += ifselements[p].nu_hat.value
+                evals[j].nu_hat.value += ifselements[p].mu_hat.value    
 
-                if ifselements[p].mu_hat.value >= evals[j].nu_hat.value:
-                    evals[j].nu_hat = ifselements[p].mu_hat
-                if ifselements[p].nu_hat.value >= evals[j].mu_hat.value:
-                    evals[j].mu_hat = ifselements[p].nu_hat
+                # Obtain MISVs per class
+                if ifselements[p].mu_hat.value >= misvs[i].mu_hat.value:
+                    misvs[i].mu_hat = ifselements[p].mu_hat
+                if ifselements[p].nu_hat.value >= misvs[i].nu_hat.value:
+                    misvs[i].nu_hat = ifselements[p].nu_hat
+
+                if ifselements[p].mu_hat.value >= misvs[j].nu_hat.value:
+                    misvs[j].nu_hat = ifselements[p].mu_hat
+                if ifselements[p].nu_hat.value >= misvs[j].mu_hat.value:
+                    misvs[j].mu_hat = ifselements[p].nu_hat 
                                   
                 p+=1
 
-                # print("votes[{0}]: {2} votes[{1}]: {3} evals[{0}]: {4:5.4f}, {5}, {6} evals[{1}]: {7:5.4f}, {8}, {9}".format(
-                #     i,j,votes[i],votes[j], evals[i].buoyancy, evals[i].mu_hat.misv_idx, evals[i].nu_hat.misv_idx,
-                #     evals[j].buoyancy, evals[j].mu_hat.misv_idx, evals[j].nu_hat.misv_idx ))
+        eta = 1
+       
+        for eval in evals:
+            eta_eval = max(1, eval.mu_hat.value + eval.nu_hat.value)
+            if eta_eval > eta:
+                eta = eta_eval
+    
+        for i in range(len(cs)):
+            evals[i].mu_hat.misv_idx = misvs[i].mu_hat.misv_idx
+            evals[i].nu_hat.misv_idx = misvs[i].nu_hat.misv_idx
+            evals[i] = evals[i].normalize(eta)
         
         indices_classes =  [c for c in range(len(cs))]  
         sorted_classes = list(zip(indices_classes, votes, evals))
-        sorted_classes.sort(key=self.__sort_fn,reverse=True)
+        sorted_classes.sort(key=self.__sort_votes,reverse=True)
 
         # Return collection of xPrediction
         topK = [xPrediction(cs[t[0]],t[2]) for t in sorted_classes[0:k]]
         return topK
+
+
+    def evaluate_all_memberships(self, X):
+        """Performs augmented evaluation of the proposition 'X IS A' for each class A learned during the training process.
+        
+        Parameters
+        X:  ndarray of shape (n_features,) consisting of n features identified for X. 
+
+        Returns
+        arr : array of n xIFSElements representing the augmented evaluations.
+        """
+
+        if not hasattr(self, "classes_"):
+            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this method.")
+
+        cs = self.classes_
+        
+        ifselements = self.decision_function_with_context(X)
+
+        if len(cs)==2:
+            eta = max(1,ifselements[0].mu_hat.value + ifselements[0].nu_hat.value)
+            return [ifselements[0].normalize(eta)]
+
+        evals = [xAIFSElement() for c in range(len(cs))]
+        misvs = [xAIFSElement() for c in range(len(cs))]
+
+        p = 0
+        for i in range(len(cs)):
+            for j in range(i+1,len(cs)):
+                # pro_i 
+                evals[i].mu_hat.value += ifselements[p].mu_hat.value
+                evals[i].nu_hat.value += ifselements[p].nu_hat.value
+                # pro_j
+                evals[j].mu_hat.value += ifselements[p].nu_hat.value
+                evals[j].nu_hat.value += ifselements[p].mu_hat.value    
+
+                # MISVs per class
+                if ifselements[p].mu_hat.value >= misvs[i].mu_hat.value:
+                    misvs[i].mu_hat = ifselements[p].mu_hat
+                if ifselements[p].nu_hat.value >= misvs[i].nu_hat.value:
+                    misvs[i].nu_hat = ifselements[p].nu_hat
+
+                if ifselements[p].mu_hat.value >= misvs[j].nu_hat.value:
+                    misvs[j].nu_hat = ifselements[p].mu_hat
+                if ifselements[p].nu_hat.value >= misvs[j].mu_hat.value:
+                    misvs[j].mu_hat = ifselements[p].nu_hat  
+                
+                p+=1
+
+        eta = 1
+        for eval in evals:
+            eta_eval = max(1, eval.mu_hat.value + eval.nu_hat.value)
+            if eta_eval > eta:
+                eta = eta_eval
+    
+        for i in range(len(cs)):
+            evals[i].mu_hat.misv_idx = misvs[i].mu_hat.misv_idx
+            evals[i].nu_hat.misv_idx = misvs[i].nu_hat.misv_idx
+            evals[i] = evals[i].normalize(eta)
+
+        return evals
 
 
     def  is_member_of(self, X, class_idx):
@@ -360,32 +442,34 @@ class xSVMC(SVC):
         elem : Augmented IFSElement representing the augmented evaluation of 'X IS A'.
         """
 
-        if not hasattr(self, "classes_"):
-            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this method.")
+        evals = self.evaluate_all_memberships(X)
+        
+        return evals[class_idx]
+    
+    def predict_with_context(self, X):
+        """Performs an augmented prediction of the top-K classes for X 
+        
+        Parameters
+        X :  ndarray of shape (n_features,) consisting of n features identified for X. 
 
+        Returns
+        topK : list of the top-K classes predicted for X.
+
+        """
         cs = self.classes_
         k = self.k
-        
-        ifselements = self.decision_function_with_context(X)
+        evals = self.evaluate_all_memberships(X)
 
         if len(cs)==2:
-            ifselements[0]
+            if evals[0].buoyancy > 0: 
+                return [xPrediction(cs[1],evals[0])]
+            else:
+                return [xPrediction(cs[0],evals[0])]
+        
+        indices_classes =  [c for c in range(len(cs))]  
+        sorted_classes = list(zip(indices_classes, evals))
+        sorted_classes.sort(key=self.__sort_buoyancy,reverse=True)
 
-        evals = [xAIFSElement() for c in range(len(cs))]
-
-        p = 0
-        for i in range(len(cs)):
-            for j in range(i+1,len(cs)):
-                if ifselements[p].mu_hat.value >= evals[i].mu_hat.value:
-                    evals[i].mu_hat = ifselements[p].mu_hat
-                if ifselements[p].nu_hat.value >= evals[i].nu_hat.value:
-                    evals[i].nu_hat = ifselements[p].nu_hat
-
-                if ifselements[p].mu_hat.value >= evals[j].nu_hat.value:
-                    evals[j].nu_hat = ifselements[p].mu_hat
-                if ifselements[p].nu_hat.value >= evals[j].mu_hat.value:
-                    evals[j].mu_hat = ifselements[p].nu_hat
-                                  
-                p+=1
-
-        return evals[class_idx]
+        # Return collection of xPrediction
+        topK = [xPrediction(cs[t[0]],t[1]) for t in sorted_classes[0:k]]
+        return topK
