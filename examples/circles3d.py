@@ -69,7 +69,7 @@ cArray =  ['#ff0000', '#0000ff']
 cm_bright = ListedColormap(cArray)
 
 nrows = 1
-ncols = 2
+ncols = 3
 idxObject = 0
 
 
@@ -92,9 +92,9 @@ for row in range(nrows):
             idx1 = ref_SVs[idx0]
             v1 = X_train[idx1]
             idxColor = y_train[idx1]
-            ret = clf.decision_function([v1])
-            ax.scatter([v1[0]], [v1[1]], ret, s=80, c=[cArray[idxColor]], alpha=1.0)
-            ax.text(v1[0] + 0.1, v1[1]+0.1, ret[0]+0.1, ('%d' % idx0), size=7, horizontalalignment='left', color='#030303')
+            ret = clf.predict_with_context(v1)
+            ax.scatter([v1[0]], [v1[1]], ret[0].eval.buoyancy , s=80, c=[cArray[idxColor]], alpha=1.0)
+            ax.text(v1[0] + 0.1, v1[1]+0.1, ret[0].eval.buoyancy+0.1, ('%d' % idx0), size=7, horizontalalignment='left', color='#030303')
 
         ax.set_xlim(xx.min(), xx.max())
         ax.set_ylim(yy.min(), yy.max())
@@ -104,8 +104,7 @@ for row in range(nrows):
         ax.set_zticks(())
 
         x = X_test[idxObject]
-        x_class = clf.predict([x])
-        x_influence = clf.decision_function([x])
+        prediction1 = clf.predict([x])
         
         print("---")
         topK = clf.predict_with_context(x)
@@ -114,26 +113,26 @@ for row in range(nrows):
         idxPositiveMISV = ref_SVs[prediction.eval.mu_hat.misv_idx]
         idxNegativeMISV = ref_SVs[prediction.eval.nu_hat.misv_idx]
 
-        print("Method 1 - Object: {0} predictedClass: {1} influence: {2}".format(idxObject, x_class[0], x_influence[0]))
-        print("Method 2 - Object: {0} predictedClass: {1} influence: {5} actualClass: {2} classMISV+: {3} classMISV-: {4}".format(
+        print("  Regular prediction - Object: {0}, predictedClass: {1}, actualClass: {2} ".format(idxObject, prediction1[0],y_test[idxObject]))
+        print("Augmented prediction - Object: {0}, predictedClass: {1}, actualClass: {2}, classMISV+: {3}, classMISV-: {4}, influence: {5:6.3f}".format(
                        idxObject, prediction.class_name, y_test[idxObject],y_train[idxPositiveMISV],y_train[idxNegativeMISV], prediction.eval.buoyancy))
         
        
         # Plot the positiveMisv
         positiveMisv = X_train[idxPositiveMISV]
-        ret = clf.decision_function([positiveMisv])
-        ax.scatter(positiveMisv[0], positiveMisv[1], ret, s=100,
+        ret = clf.predict_with_context(positiveMisv)
+        ax.scatter(positiveMisv[0], positiveMisv[1], ret[0].eval.buoyancy, s=100,
                 linewidth=2, facecolors='none', edgecolors='k', marker='o')
 
         # Plot the negativeMisv
         negativeMisv = X_train[idxNegativeMISV]
-        ret = clf.decision_function([negativeMisv])
-        ax.scatter(negativeMisv[0], negativeMisv[1], ret, s=100,
+        ret = clf.predict_with_context(negativeMisv)
+        ax.scatter(negativeMisv[0], negativeMisv[1], ret[0].eval.buoyancy, s=100,
                linewidth=2, facecolors='none', edgecolors='k', marker='o')
 
         # Plot the object
-        ax.scatter([x[0]], [x[1]], x_influence, s=40, c=[cArray[prediction.class_name]], alpha=1.0)
-        ax.scatter([x[0]], [x[1]], x_influence, s=100, c=[cArray[prediction.class_name]], marker='x')
+        ax.scatter([x[0]], [x[1]], prediction.eval.buoyancy, s=40, c=[cArray[prediction.class_name]], alpha=1.0)
+        ax.scatter([x[0]], [x[1]], prediction.eval.buoyancy, s=100, c=[cArray[prediction.class_name]], marker='x')
 
         idxObject = idxObject + 1
 

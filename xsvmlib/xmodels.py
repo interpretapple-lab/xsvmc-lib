@@ -15,6 +15,18 @@ class xAIFSElement:
     @property
     def buoyancy(self):
         return self.mu_hat.value - self.nu_hat.value
+    
+    def normalize(self, eta):
+        mu = xAAD(self.mu_hat.value/eta, self.mu_hat.misv_idx)
+        nu = xAAD(self.nu_hat.value/eta, self.nu_hat.misv_idx)
+        ret = xAIFSElement()
+        ret.mu_hat = mu
+        ret.nu_hat = nu
+        return ret
+
+  
+
+
 
 class xPrediction:
     """ Augmented Prediction with Most Influential Support Vector
