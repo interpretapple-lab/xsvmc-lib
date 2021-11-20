@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 #
-# This example shows how to use xSVMC to perform contextualized predictions of the
-# classes of handwritten digits. 
-# 
-# The example is a modified version of the OpenCV tutorial entitled 'OCR of Hand-written Data using SVM' 
-# posted on 
-#       https://docs.opencv.org/4.5.3/dd/d3b/tutorial_py_svm_opencv.html
+# This example shows how to use the most influential support vectors to build a visual representation 
+# of a contextualized evaluation. 
 #
-# Keywords: xSVMC, multiclass classification, contextualized classification
+# Keywords: xSVMC, multiclass classification, contextualized classification, visual representation
 #
 
 import cv2 as cv
@@ -53,6 +49,75 @@ def hog(img):
     hist = np.hstack(hists)     # hist is a 64 bit vector
     return hist
 
+def img2VectorsWithInfluence(img, imgPro, imgCon):
+    gx = cv.Sobel(img, cv.CV_32F, 1, 0)
+    gy = cv.Sobel(img, cv.CV_32F, 0, 1)
+
+    gxPro = cv.Sobel(imgPro, cv.CV_32F, 1, 0)
+    gyPro = cv.Sobel(imgPro, cv.CV_32F, 0, 1)
+
+    gxCon = cv.Sobel(imgCon, cv.CV_32F, 1, 0)
+    gyCon = cv.Sobel(imgCon, cv.CV_32F, 0, 1)
+
+     
+    # Create a black image
+    imgGradSize = 256
+
+    imgVectors = np.zeros((imgGradSize,imgGradSize,3), np.uint8)
+    scaleFactor = imgGradSize/SZ
+    
+    maxX = np.max(gx)
+    maxY = np.max(gy)
+    maxXY = max(maxX,maxY)
+
+    maxXPro = np.max(gxPro)
+    maxYPro = np.max(gyPro)
+    maxXYPro = max(maxXPro,maxYPro)
+
+    maxXCon = np.max(gxCon)
+    maxYCon = np.max(gyCon)
+    maxXYCon = max(maxXCon,maxYCon)
+    i = 0
+    
+    while i<SZ:
+        j = 0
+        while j<SZ:
+            pt1 = (np.int32(i*scaleFactor),np.int32(j*scaleFactor))
+
+            pt2 = (np.int32((i+gx[j][i]/maxXY)*scaleFactor), np.int32((j+gy[j][i]/maxXY)*scaleFactor))
+            pt2Pro = (np.int32((i+gxPro[j][i]/maxXYPro)*scaleFactor), np.int32((j+gyPro[j][i]/maxXYPro)*scaleFactor))
+            pt2Con = (np.int32((i+gxCon[j][i]/maxXYCon)*scaleFactor), np.int32((j+gyCon[j][i]/maxXYCon)*scaleFactor))
+
+            r = 0
+            g = 0
+            b = 0
+            if (gx[j][i] + gy[j][i] > 0):
+                if (gxPro[j][i] + gyPro[j][i] > 0):
+                    g = 255
+                    pt2Pro = (np.int32((i+(gx[j][i]/maxXY)*(gxPro[j][i]/maxXYPro))*scaleFactor), np.int32((j+(gy[j][i]/maxXY)*(gyPro[j][i]/maxXYPro))*scaleFactor))
+                    imgVectors = cv.arrowedLine(imgVectors, pt1, pt2Pro, (r,g,b) ) 
+                elif (gxCon[j][i] + gyCon[j][i] > 0):
+                    r = 255
+                    pt2Con = (np.int32((i+(gx[j][i]/maxXY)*(gxCon[j][i]/maxXYCon))*scaleFactor), np.int32((j+(gy[j][i]/maxXY)*(gyCon[j][i]/maxXYCon))*scaleFactor))
+                    imgVectors = cv.arrowedLine(imgVectors, pt1, pt2Con, (r,g,b) ) 
+                else:
+                    r = 255
+                    g = 255
+                    b = 255
+                    imgVectors = cv.arrowedLine(imgVectors, pt1, pt2, (r,g,b) ) 
+            else:
+                if (gxPro[j][i] + gyPro[j][i] > 0):
+                    r = 0
+                    g = 255
+                    b = 255
+                    imgVectors = cv.arrowedLine(imgVectors, pt1, pt2Pro, (r,g,b) ) 
+            j = j + 1
+        i = i + 1
+
+    
+
+    return imgVectors
+
 
 digits = cv.imread(cv.samples.findFile('examples/digits.png'),0)
 if digits is None:
@@ -97,7 +162,7 @@ print(classification_report(y_test, predictions))
 idx_obj = 0
 
 plotRows = k
-plotCols = 3
+plotCols = 4
 
 from matplotlib.colors import Colormap, ListedColormap
 
@@ -113,8 +178,8 @@ while idx_obj < len(digits_coord):
     plot_ctr = 1
     for position in range(k):
         prediction = topK[position]
-        idx_proMISV = ref_SVs[prediction.eval.membership.reason]
-        idx_conMISV = ref_SVs[prediction.eval.nonmembership.reason]
+        idx_proMISV = ref_SVs[prediction.eval.mu_hat.misv_idx]
+        idx_conMISV = ref_SVs[prediction.eval.nu_hat.misv_idx]
         
         print("Object: {0} predictedClass[{5}]: {4} actualClass: {1} classMISV+: {2} classMISV-: {3} rel_idxMISV+: {6} rel_idxMISV-: {7}".format(
             idx_obj,y_test[idx_obj][0],y_train[idx_proMISV][0],y_train[idx_conMISV][0], prediction.class_name, position,prediction.eval.mu_hat.misv_idx, prediction.eval.nu_hat.misv_idx))
@@ -123,6 +188,8 @@ while idx_obj < len(digits_coord):
         digit = deskew(test_cells[digits_coord[idx_obj][0]][digits_coord[idx_obj][1]])
         misvPro = deskew(train_cells[digits_coord[idx_proMISV][0]][digits_coord[idx_proMISV][1]])
         misvCon = deskew(train_cells[digits_coord[idx_conMISV][0]][digits_coord[idx_conMISV][1]])
+
+        imgWithInfluence = img2VectorsWithInfluence(digit, misvPro, misvCon)
 
         plt.subplot(plotRows,plotCols,plot_ctr),plt.imshow(digit, cmap=cm),plt.axis('off')
         plt.title('obj_{0} ({1})'.format(idx_obj, y_test[idx_obj][0] ))
@@ -135,7 +202,11 @@ while idx_obj < len(digits_coord):
         plt.subplot(plotRows,plotCols,plot_ctr),plt.imshow(misvCon, cmap=cm),plt.axis('off')
         plt.title('MISV- ({0})'.format(y_train[idx_conMISV][0]))
         plot_ctr+=1
+
+        plt.subplot(plotRows,plotCols,plot_ctr),plt.imshow(imgWithInfluence),plt.axis('off')
+        plt.title('Heatmap')
+        plot_ctr+=1
     plt.show()
 
-    idx_obj+= 250
+    idx_obj+= 125
 

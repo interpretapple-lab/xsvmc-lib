@@ -8,16 +8,27 @@ from math import exp
 class xSVMC(SVC):
     """Explainable Support Vector Machine Classification
     
-    Implementation based on Scikit-learn SVC class,
-    with a modified version of the decision and predict
-    functions which identifies the MISV for each class
+    This class is an implementation of the variant of the *support vector machine* (SVM)[1] classification process, 
+    called *explainable SVM classification* (XSVMC), proposed in [2]. In XSVMC the most influential support vectors (MISVs) 
+    are used for identifying what has been relevant to the classification. These MISVs can be used for contextualizing the 
+    evaluations in such a way that the forthcoming predictions can be explained with ease.
+    
+    This implementation is based on Scikit-learn SVC class.
+  
+    Parameters:
 
-   Parameters
-    ----------
-        
     k: int, default=1
         Number of possible classes expected for the
         prediction output.
+
+    References:
+        [1] V.N.Vapnik,The Nature of Statistical Learning Theory, Springer-Verlag, New York, NY, USA, 1995.
+            http://dx.doi.org/10.1007/978-1-4757-3264-1
+
+        [2] M. Loor and G. De Tré. Contextualizing Support Vector Machine Predictions.
+            International Journal of Computational Intelligence Systems, Volume 13, Issue 1, 2020,
+            Pages 1483-1497,  ISSN 1875-6883, https://doi.org/10.2991/ijcis.d.200910.002
+
         
     """
         
@@ -92,15 +103,15 @@ class xSVMC(SVC):
     def decision_function_with_context(self, X):
         """ Evaluates the decision function for the sample X.
 
-        Parameters
+        Parameters:
         X: ndarray of shape (n_features,) consisting of n features identified for X. 
 
-        Returns
+        Returns:
         df: ndarray of shape (n_classes * (n_classes-1) / 2,).
             Returns the decision function of the sample for each class in the model. Since decision_function_shape='ovo'
             is always used as multi-class strategy, df is an array of shape (n_classes * (n_classes-1) / 2,).
 
-        Notes
+        Notes:
             About decision_function_shape : {'ovo', 'ovr'}
 
             Whether to return a one-vs-rest ('ovr') decision function of shape
@@ -198,10 +209,10 @@ class xSVMC(SVC):
     def __binary_decision_function_with_context(self, X):
         """ Evaluates the binary decision function for the sample X.
 
-        Parameters
+        Parameters:
         X: ndarray of shape (n_features,) consisting of n features identified for X. 
 
-        Returns
+        Returns:
         df: ndarray of shape (n_classes * (n_classes-1) / 2,).
             Returns the decision function of the sample for each class in the model. Since decision_function_shape='ovo'
             is always used as multi-class strategy, df is an array of shape (n_classes * (n_classes-1) / 2,).
@@ -294,11 +305,11 @@ class xSVMC(SVC):
     def predict_with_context_by_voting(self, X):
         """Performs an augmented prediction of the top-K classes for the sample X 
         
-        Parameters
-        X :  ndarray of shape (n_features,) consisting of n features identified for X. 
+        Parameters:
+        X:  ndarray of shape (n_features,) consisting of n features identified for X. 
 
         Returns
-        topK : list of the top-K classes predicted for X.
+        topK: list of the top-K classes predicted for X.
 
         """
         
@@ -373,10 +384,10 @@ class xSVMC(SVC):
     def evaluate_all_memberships(self, X):
         """Performs augmented evaluation of the proposition 'X IS A' for each class A learned during the training process.
         
-        Parameters
+        Parameters:
         X:  ndarray of shape (n_features,) consisting of n features identified for X. 
 
-        Returns
+        Returns:
         arr : array of n xIFSElements representing the augmented evaluations.
         """
 
@@ -445,6 +456,8 @@ class xSVMC(SVC):
         evals = self.evaluate_all_memberships(X)
         
         return evals[class_idx]
+
+
     
     def predict_with_context(self, X):
         """Performs an augmented prediction of the top-K classes for X 
