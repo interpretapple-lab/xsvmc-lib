@@ -52,8 +52,19 @@ class AIFSElement():
                 pages 67-78 ISBN: 978-989-758-327-8. https://doi.org/10.5220/0006956500670078.
         """
         return self.membership.level - self.nonmembership.level
-        
+    
+    @property
+    def hesitation(self):
+        """
+        This property implements the hesitation margin of an IFSElement [1].
 
+        Reference:
+            [1] K. Atanassov, Intuitionistic fuzzy sets, Fuzzy Sets and Systems, Volume 20, Issue 1, 1986,
+            Pages 87-96, ISSN 0165-0114, https://doi.org/10.1016/S0165-0114(86)80034-3.
+        return self.membership.level - self.nonmembership.level
+        """
+        return 1.0 - self.membership.level - self.nonmembership.level
+        
 
 class xAAD(AAD):
     """ Augmented Appraisal Degree with the (index of the) most influential support vector (MISV)

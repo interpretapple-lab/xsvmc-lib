@@ -1,4 +1,4 @@
-from sklearn.svm._classes import SVC 
+from sklearn.svm import SVC 
 from xsvmlib.xmodels import xAAD, xAIFSElement, xPrediction
 import numpy as np
 from math import exp
@@ -149,7 +149,6 @@ class xSVMC(SVC):
             xIFSElements[i] = xAIFSElement()
 
         p2 = 0
-        
         for i in range(len(nv)):
             for j in range(i+1,len(nv)):
                 influence_pro_i = 0
@@ -166,28 +165,31 @@ class xSVMC(SVC):
                             max_influence_pro_i.value = value
                             max_influence_pro_i.misv_idx = p
                     else:
-                        influence_pro_j -= value
-                        if abs(value) >= max_influence_pro_j.value:
-                            max_influence_pro_j.value = abs(value)
-                            max_influence_pro_j.misv_idx = p
+                        influence_pro_j += abs(value)
+                        if p in range (start[j], end[j]):
+                            if abs(value) >= max_influence_pro_j.value:
+                                max_influence_pro_j.value = abs(value)
+                                max_influence_pro_j.misv_idx = p
 
-                    #print("i: {0}, j: {1}, sv: {2}, value: {8:3.4f}, max_pro_i: {3:3.4f}, {4:3.4f}, max_con_i: {5:3.4f}, {6},  a[j-1][p]: {7:3.4f}".format(i,j,p, max_influence_pro_i.value, max_influence_pro_i.misv_idx, max_influence_pro_j.value, max_influence_pro_j.misv_idx, a[j-1][p], value))
+                    # print("i: {0}, j: {1}, sv: {2}, max_pro_{0}: ({3:3.4f}, {4}), max_pro_{1}: ({5:3.4f}, {6}), value: {7:3.4f}".format(
+                    #     i,j,p, max_influence_pro_i.value, max_influence_pro_i.misv_idx, max_influence_pro_j.value, max_influence_pro_j.misv_idx, value))
 
                 for p in range (start[j], end[j]):
                     value = a[ i ][p] * kernel_values[p]
                     if value >= 0:
                         influence_pro_i += value
-                        if value >= max_influence_pro_i.value:
-                            max_influence_pro_i.value = value
-                            max_influence_pro_i.misv_idx = p
+                        if p in range(start[i], end[i]):
+                            if value >= max_influence_pro_i.value:
+                                max_influence_pro_i.value = value
+                                max_influence_pro_i.misv_idx = p
                     else:
-                        influence_pro_j -= value
+                        influence_pro_j += abs(value)
                         if abs(value) >= max_influence_pro_j.value:
                             max_influence_pro_j.value = abs(value)
                             max_influence_pro_j.misv_idx = p
 
-                    #print("i: {0}, j: {1}, sv: {2}, value: {8:3.4f}, max_pro_i: {3:3.4f}, {4}, max_con_i: {5:3.4f}, {6}, a[i][p]: {7:3.4f} ".format(i,j,p, max_influence_pro_i.value, max_influence_pro_i.misv_idx, max_influence_pro_j.value, max_influence_pro_j.misv_idx, a[i][p], value))
-
+                    # print("i: {0}, j: {1}, sv: {2}, max_pro_{0}: ({3:3.4f}, {4}), max_pro_{1}: ({5:3.4f}, {6}), value: {7:3.4f}".format(
+                    #     i,j,p, max_influence_pro_i.value, max_influence_pro_i.misv_idx, max_influence_pro_j.value, max_influence_pro_j.misv_idx, value))
                 
                
                 if b[p2]>0:
@@ -198,7 +200,9 @@ class xSVMC(SVC):
                 xIFSElements[p2].mu_hat = xAAD(influence_pro_i, max_influence_pro_i.misv_idx) 
                 xIFSElements[p2].nu_hat = xAAD(influence_pro_j, max_influence_pro_j.misv_idx)
 
-                # print("i: {5} j: {6} pro_i: {0:3.4f}, pro_j: {1:3.4f}, buoyancy: {2:3.4f}, pro_i.misv_idx: {3},  pro_j.misv_idx: {4}".format(xIFSElements[p2].mu_hat.value, xIFSElements[p2].nu_hat.value, xIFSElements[p2].buoyancy, xIFSElements[p2].mu_hat.misv_idx, xIFSElements[p2].nu_hat.misv_idx, i, j))
+                # print("-- {0}  pro_{1}: ({2:3.4f}, {3}), pro_{4}: ({5:3.4f}, {6} )".format(
+                #     p2, i, xIFSElements[p2].mu_hat.value, xIFSElements[p2].mu_hat.misv_idx, 
+                #         j, xIFSElements[p2].nu_hat.value, xIFSElements[p2].nu_hat.misv_idx))
 
 
                 p2 += 1
@@ -425,8 +429,14 @@ class xSVMC(SVC):
                     misvs[j].nu_hat = ifselements[p].mu_hat
                 if ifselements[p].nu_hat.value >= misvs[j].mu_hat.value:
                     misvs[j].mu_hat = ifselements[p].nu_hat  
-                
+
+                # print("MISV_{0}: ({1},{2}), MISV_{3}: ({4},{5}) p: {6}".format(
+                #     i, misvs[i].mu_hat.misv_idx , misvs[i].nu_hat.misv_idx,
+                #     j, misvs[j].mu_hat.misv_idx , misvs[j].nu_hat.misv_idx, p))
+
                 p+=1
+
+                
 
         eta = 1
         for eval in evals:
