@@ -6,12 +6,18 @@
 
 Although they are not required by *XSVMC-Lib*, the following packages are necessary for running the examples:
 
-- [Numpy](https://numpy.org) (python3 -m pip install numpy)
-- [Matploplib](https://matplotlib.org) (python3 -m pip install matploplib)
-- [OpenCV](https://opencv.org) (python3 -m pip install opencv-python)
+- [Numpy](https://numpy.org) (```python3 -m pip install numpy```)
+- [Matploplib](https://matplotlib.org) (```python3 -m pip install matploplib```)
+- [OpenCV](https://opencv.org) (```python3 -m pip install opencv-python```)
 
+## Examples
 
+To run an example, say *digits_explanation.py*, you may use the following commands:
 
+```
+cd /path/to/xsvmc-lib
+python3 examples/digits_explanation.py
+```
 
 ## Datasets
 Parts of the following datasets are used in several examples that illustrate the use of *XSVMC-Lib*.
