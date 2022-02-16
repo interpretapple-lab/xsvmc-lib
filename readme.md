@@ -2,7 +2,16 @@
 *XSVMC-Lib* is an open source library that implements algorithms proposed to make support vector machine (SVM) predictions interpretable.
 
 ## Requirements
-*XSVMC-Lib* has been implemented as an extension of [SciKit-Learn](https://scikit-learn.org).
+*XSVMC-Lib* requires Python 3.8+. Since *XSVMC-Lib* has been implemented as an extension of *sklearn.svm.SVC*, it also requires the [SciKit-Learn](https://scikit-learn.org) package (python3 -m pip install sklearn).
+
+Although they are not required by *XSVMC-Lib*, the following packages are necessary for running the examples:
+
+- [Numpy](https://numpy.org) (python3 -m pip install numpy)
+- [Matploplib](https://matplotlib.org) (python3 -m pip install matploplib)
+- [OpenCV](https://opencv.org) (python3 -m pip install opencv-python)
+
+
+
 
 ## Datasets
 Parts of the following datasets are used in several examples that illustrate the use of *XSVMC-Lib*.
@@ -12,5 +21,5 @@ Parts of the following datasets are used in several examples that illustrate the
 
 
 ## License
-IFSMetrics is released under the [Apache License, Version 2.0](LICENSE).
+*XSVMC-Lib* is released under the [Apache License, Version 2.0](LICENSE).
 
