@@ -114,7 +114,7 @@ def run_test(output_dir):
    
         actual_class =  y_test[idx_obj][0]
         # Contextualized evaluation process
-        topK = clf.predict_with_context(x)
+        topK = clf.predict_with_context([x])[0]
 
 
         fig = plt.figure(figsize=(plotCols+6, plotRows))

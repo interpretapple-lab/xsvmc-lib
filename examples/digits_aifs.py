@@ -74,10 +74,13 @@ def run_example():
     clf = xSVMC(kernel='poly', C=c0, degree=degree, gamma=gamma, coef0=coef0, k = k)
     clf.fit(X_train, y_train.ravel())
 
-    X_test2 = X_test[0:20]
+    X_test2 = X_test[0:1000]
     idx_category = 0
     print("Building AIFS '{0}'...".format(categories[idx_category]))
-    aifs = [clf.is_member_of(o, idx_category) for o in X_test2]
+
+    # aifs = [clf.is_member_of(o, idx_category) for o in X_test2] # too slow...not recommended
+    aifs = clf.is_member_of(X_test2, idx_category)  # recommended
+
     print("AIFS '{0}'".format(categories[idx_category]))
     for elem in aifs:
         print (" mu_hat: ({1:0.3f}, {2:3d}), nu_hat: ({3:0.3f}, {4:3d}), hesitation: {0:6.3f}".format( elem.hesitation, elem.mu_hat.value, elem.mu_hat.misv_idx, elem.nu_hat.value, elem.nu_hat.misv_idx))

@@ -104,26 +104,28 @@ def run_example(output_dir, get_article):
     print("Learning...")
     clf.fit(X_train, y_train.ravel())
 
-    idx_obj = 0
+    indices = np.array([i for i in range(0,len(X_test), 250)])
+    X_test2 = X_test[indices]
+    all_topK_predictions = clf.predict_with_context(X_test2)
+    all_topK_predictions_2 = clf.predict_with_context_by_voting(X_test2)
+    all_evals = clf.evaluate_all_memberships(X_test2)
 
-    for _ in range(10):
-        x = X_test[idx_obj]
-        print("----- Object {0} -----".format(idx_obj))
+    for idx_obj in range(len(X_test2)):
+        print("----- Object {0} -----".format(indices[idx_obj]))
 
         print("- Top-{0} Predictions".format(k))
-        topK_predictions = clf.predict_with_context(x)
-        topK_predictions_2 = clf.predict_with_context_by_voting(x)
+        topK_predictions = all_topK_predictions[idx_obj]
+        topK_predictions_2 = all_topK_predictions_2[idx_obj]
         for j in range(k):
             print("  buoyancy-rank top-{1} class: {0}, misv+: {3:3d}, misv-: {4:3d}, buoyancy: {2:6.3f}".format(topK_predictions[j].class_name, j+1, topK_predictions[j].eval.buoyancy, topK_predictions[j].eval.mu_hat.misv_idx, topK_predictions[j].eval.nu_hat.misv_idx))
             print("     votes-rank top-{1} class: {0}, misv+: {3:3d}, misv-: {4:3d}, buoyancy: {2:6.3f}".format(topK_predictions_2[j].class_name, j+1, topK_predictions_2[j].eval.buoyancy, topK_predictions_2[j].eval.mu_hat.misv_idx, topK_predictions_2[j].eval.nu_hat.misv_idx))
    
         print("- Memberships ")
-        evals = clf.evaluate_all_memberships(x)
+        evals = all_evals[idx_obj]
         for idx_class in range(len(clf.classes_)):
             ret1 = evals[idx_class]
-            print ("  class: {0}, mu_hat: ({2:0.3f}, {3:3d}), nu_hat: ({4:0.3f}, {5:3d}), buoyancy: {1:6.3f}".format(clf.classes_[idx_class], ret1.buoyancy, ret1.mu_hat.value, ret1.mu_hat.misv_idx, ret1.nu_hat.value, ret1.nu_hat.misv_idx))
+            print ("  idx_class: {0}, mu_hat: ({2:0.3f}, {3:3d}), nu_hat: ({4:0.3f}, {5:3d}), buoyancy: {1:6.3f}".format(idx_class, ret1.buoyancy, ret1.mu_hat.value, ret1.mu_hat.misv_idx, ret1.nu_hat.value, ret1.nu_hat.misv_idx))
 
-        idx_obj += 250
         print("---")
 
 

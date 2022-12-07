@@ -29,3 +29,21 @@ Parts of the following datasets are used in several examples that illustrate the
 ## License
 *XSVMC-Lib* is released under the [Apache License, Version 2.0](LICENSE).
 
+## Citing
+If you use *XSVMC-Lib*, please cite the following article:
+
+M. Loor, A. Tapia-Rosero and G. De Tré, "[An Open-Source Software Library for Explainable Support Vector Machine Classification](https://doi.org/10.1109/FUZZ-IEEE55066.2022.9882731)," 2022 IEEE International Conference on Fuzzy Systems (FUZZ-IEEE), 2022, pp. 1-7, doi: 10.1109/FUZZ-IEEE55066.2022.9882731.
+
+
+### BibTeX
+
+```
+@INPROCEEDINGS{
+    xsvmlib,  
+    author={Loor, Marcelo and Tapia-Rosero, Ana and {De Tr\'{e}}, Guy},  
+    booktitle={2022 IEEE International Conference on Fuzzy Systems (FUZZ-IEEE)},   
+    title={An Open-Source Software Library for Explainable Support Vector Machine Classification},   
+    year={2022}, pages={1-7},  
+    doi={10.1109/FUZZ-IEEE55066.2022.9882731}
+}
+```

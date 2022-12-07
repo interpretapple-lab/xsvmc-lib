@@ -108,15 +108,15 @@ def run_example():
     print("Learning (classifier C)...")
     clf_C.fit(X_train, y_train.ravel())
 
-    X_test2 = X_test[0:20]
+    X_test2 = X_test[0:200]
     print("Evaluating memberships (classifier A)...")
-    all_memberships_evals_A = [clf_A.evaluate_all_memberships(o) for o in X_test2]
+    all_memberships_evals_A = clf_A.evaluate_all_memberships(X_test2) 
 
     print("Evaluating memberships (classifier B)...")
-    all_memberships_evals_B = [clf_B.evaluate_all_memberships(o) for o in X_test2]
+    all_memberships_evals_B = clf_B.evaluate_all_memberships(X_test2) 
 
     print("Evaluating memberships (classifier C)...")
-    all_memberships_evals_C = [clf_C.evaluate_all_memberships(o) for o in X_test2]
+    all_memberships_evals_C = clf_C.evaluate_all_memberships(X_test2)
 
     n_cats = len(categories)
     sims_A_vs_B = np.zeros(n_cats)

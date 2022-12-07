@@ -4,7 +4,6 @@ import numpy as np
 from math import exp
 
 
-
 class xSVMC(SVC):
     """Explainable Support Vector Machine Classification
     
@@ -99,9 +98,8 @@ class xSVMC(SVC):
             return self.kernel(V, X) 
 
         
-
-    def decision_function_with_context(self, X):
-        """ Evaluates the decision function for the sample X.
+    def __decision_function_with_context_1dim(self, X):
+        """ Evaluates the decision function for sample X.
 
         Parameters:
         X: ndarray of shape (n_features,) consisting of n features identified for X. 
@@ -129,9 +127,10 @@ class xSVMC(SVC):
             raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.")
 
         if len(self.classes_) == 2:
-            return self.__binary_decision_function_with_context(X)
+            return self.__binary_decision_function_with_context_1dim(X)
 
-        nv = self.n_support_
+        nv = self.n_support_ # number of SVs for each class
+        n_classes = len(nv)
         a = self._dual_coef_
         b  = self._intercept_
         sv = self.support_vectors_
@@ -140,17 +139,19 @@ class xSVMC(SVC):
         params = self.get_params()
 
         kernel_values = [self.compute_kernel(v, X, params) for v in sv] 
-
-        start = [sum(nv[:i]) for i in range(len(nv))]
-        end = [start[i] + nv[i] for i in range(len(nv))]
+        
+        start = [ sum(nv[:i]) for i in range(n_classes)]
+        # end = [start[i] + nv[i] for i in range(len(nv))]
+        end = start + nv
+       
         
         xIFSElements = {}
-        for i in range(len(b)):
-            xIFSElements[i] = xAIFSElement()
+        # for i in range(len(b)):
+        #     xIFSElements[i] = xAIFSElement()
 
         p2 = 0
-        for i in range(len(nv)):
-            for j in range(i+1,len(nv)):
+        for i in range(n_classes):
+            for j in range(i+1,n_classes):
                 influence_pro_i = 0
                 influence_pro_j = 0
 
@@ -170,7 +171,7 @@ class xSVMC(SVC):
                             if abs(value) >= max_influence_pro_j.value:
                                 max_influence_pro_j.value = abs(value)
                                 max_influence_pro_j.misv_idx = p
-
+             
                     # print("i: {0}, j: {1}, sv: {2}, max_pro_{0}: ({3:3.4f}, {4}), max_pro_{1}: ({5:3.4f}, {6}), value: {7:3.4f}".format(
                     #     i,j,p, max_influence_pro_i.value, max_influence_pro_i.misv_idx, max_influence_pro_j.value, max_influence_pro_j.misv_idx, value))
 
@@ -190,28 +191,158 @@ class xSVMC(SVC):
 
                     # print("i: {0}, j: {1}, sv: {2}, max_pro_{0}: ({3:3.4f}, {4}), max_pro_{1}: ({5:3.4f}, {6}), value: {7:3.4f}".format(
                     #     i,j,p, max_influence_pro_i.value, max_influence_pro_i.misv_idx, max_influence_pro_j.value, max_influence_pro_j.misv_idx, value))
-                
+
                
                 if b[p2]>0:
                     influence_pro_i+=b[p2]
                 else:
                     influence_pro_j-=b[p2]
 
-                xIFSElements[p2].mu_hat = xAAD(influence_pro_i, max_influence_pro_i.misv_idx) 
-                xIFSElements[p2].nu_hat = xAAD(influence_pro_j, max_influence_pro_j.misv_idx)
+                xIFSElements[p2] = xAIFSElement(
+                         xAAD(influence_pro_i, max_influence_pro_i.misv_idx)  ,
+                         xAAD(influence_pro_j, max_influence_pro_j.misv_idx)
+                )
 
                 # print("-- {0}  pro_{1}: ({2:3.4f}, {3}), pro_{4}: ({5:3.4f}, {6} )".format(
                 #     p2, i, xIFSElements[p2].mu_hat.value, xIFSElements[p2].mu_hat.misv_idx, 
                 #         j, xIFSElements[p2].nu_hat.value, xIFSElements[p2].nu_hat.misv_idx))
 
-
                 p2 += 1
 
         return xIFSElements
 
+    def __decision_function_with_context_ndim(self, X):
+        """ Evaluates the decision function for each sample in X.
 
-    def __binary_decision_function_with_context(self, X):
-        """ Evaluates the binary decision function for the sample X.
+        Parameters:
+        X: ndarray of shape (n_samples, n_features). 
+
+        Returns:
+        df: ndarray of shape (n_samples, n_classes * (n_classes-1) / 2).
+            Returns the decision function of the sample for each class in the model. Since decision_function_shape='ovo'
+            is always used as multi-class strategy, df is an array of shape (n_classes * (n_classes-1) / 2,).
+
+        Notes:
+            About decision_function_shape : {'ovo', 'ovr'}
+
+            Whether to return a one-vs-rest ('ovr') decision function of shape
+            (n_samples, n_classes) as all other classifiers, or the original
+            one-vs-one ('ovo') decision function of libsvm which has shape
+            (n_samples, n_classes * (n_classes - 1) / 2). However, one-vs-one
+            ('ovo') is always used as multi-class strategy. The parameter is
+            ignored for binary classification.
+
+            See https://github.com/scikit-learn/scikit-learn/blob/23afd5d95c18915c55070cecaecf9f3030ae9bbb/sklearn/svm/_classes.py
+                    
+        """
+
+        if not hasattr(self, "classes_"):
+            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.")
+
+       
+        nv = self.n_support_ # number of SVs for each class
+        n_classes = len(nv)
+        a = self._dual_coef_
+        b  = self._intercept_
+        sv = self.support_vectors_
+        n_samples = X.shape[0]
+        
+        params = self.get_params()
+
+        kernel_values = self.compute_kernel(X, np.transpose(sv), params)
+
+        start = [ sum(nv[:i]) for i in range(n_classes)]
+        end = np.add.accumulate(nv)
+       
+        weighted_vals = np.multiply( a, kernel_values[:, np.newaxis])
+
+        n_comparisons = n_classes*(n_classes-1)//2
+
+        ret_memberships = np.zeros(shape=(n_comparisons,n_samples)) 
+        ret_nonmemberships =  np.zeros(shape=(n_comparisons,n_samples)) 
+        ret_pro_misvs = np.full(shape=(n_comparisons,n_samples),fill_value=-1, dtype=int)
+        ret_con_misvs = np.full(shape=(n_comparisons,n_samples),fill_value=-1, dtype=int)
+       
+         
+        p2 = 0
+        for i in range(n_classes):
+            for j in range(i+1,n_classes):
+                 
+                part_class_i = weighted_vals[:,j-1,start[i]:end[i]]
+                part_class_j = weighted_vals[:,i,  start[j]:end[j]]
+
+                positives_class_i = np.greater(part_class_i,0) 
+                positives_class_j = np.greater(part_class_j,0) 
+                negatives_class_i = np.less(part_class_i,0) 
+                negatives_class_j = np.less(part_class_j,0)
+
+                influence_pro_i = np.sum(part_class_i, where=positives_class_i, axis=1) + np.sum(part_class_j, where=positives_class_j, axis=1)
+                influence_pro_j = -(np.sum(part_class_i, where=negatives_class_i, axis=1) + np.sum(part_class_j, where=negatives_class_j, axis=1))
+
+                max_influence_pro_i_misv_idx = np.argmax(part_class_i, axis=1) + start[i]
+                max_influence_pro_j_misv_idx = np.argmax(-part_class_j, axis=1) + start[j]
+
+                if b[p2]>0:
+                    influence_pro_i+=b[p2]
+                else:
+                    influence_pro_j-=b[p2]
+       
+                ret_memberships[p2] = np.array([influence_pro_i])
+                ret_nonmemberships[p2] = np.array([influence_pro_j])
+                ret_pro_misvs[p2] = np.array([max_influence_pro_i_misv_idx])
+                ret_con_misvs[p2] = np.array([max_influence_pro_j_misv_idx])
+
+                p2 += 1
+
+        if len(self.classes_) == 2:
+            return ret_nonmemberships.transpose(), ret_memberships.transpose(), ret_con_misvs.transpose(), ret_pro_misvs.transpose()
+        else:
+            return ret_memberships.transpose(), ret_nonmemberships.transpose(), ret_pro_misvs.transpose(), ret_con_misvs.transpose()
+
+
+    def decision_function_with_context(self, X):
+        """ Evaluates the decision function for each sample in X.
+
+        Parameters:
+        X:  ndarray of shape (n_samples, n_features); or 
+            ndarray of shape (n_features,). 
+
+        Returns:
+            A 4-tuple (memberships, nonmemberships, pro_MISVs, con_MISVs) consisting of 4 ndarrays of shape 
+            (n_samples, n_classes * (n_classes-1) / 2). 
+
+            Returns the decision function of the sample for each class in the model. Since decision_function_shape='ovo'
+            is always used as multi-class strategy, df is an array of shape (n_samples, n_classes * (n_classes-1) / 2).
+
+            N.B.: (memberships - nonmemberships) must be equal to decision_function(self, X)
+
+        Notes:
+            About decision_function_shape : {'ovo', 'ovr'}
+
+            Whether to return a one-vs-rest ('ovr') decision function of shape
+            (n_samples, n_classes) as all other classifiers, or the original
+            one-vs-one ('ovo') decision function of libsvm which has shape
+            (n_samples, n_classes * (n_classes - 1) / 2). However, one-vs-one
+            ('ovo') is always used as multi-class strategy. The parameter is
+            ignored for binary classification.
+
+            See https://github.com/scikit-learn/scikit-learn/blob/23afd5d95c18915c55070cecaecf9f3030ae9bbb/sklearn/svm/_classes.py
+                    
+        """
+
+        if isinstance(X,np.ndarray):
+            if X.ndim == 1:
+                return self.__decision_function_with_context_ndim(np.array([X]))
+            else:
+                return self.__decision_function_with_context_ndim(X)
+        elif isinstance(X, list):
+            return self.__decision_function_with_context_ndim(np.array(X))
+        else:
+            raise ValueError("X parameter must be an ndarray")
+
+    
+    def __binary_decision_function_with_context_1dim(self, X):
+        """ Evaluates the binary decision function for sample X.
 
         Parameters:
         X: ndarray of shape (n_features,) consisting of n features identified for X. 
@@ -299,6 +430,8 @@ class xSVMC(SVC):
                 p2 += 1
 
         return xIFSElements
+    
+
 
     def __sort_votes(self, e):
         return e[1]
@@ -306,13 +439,13 @@ class xSVMC(SVC):
     def __sort_buoyancy(self, e):
         return e[1].buoyancy
 
-    def predict_with_context_by_voting(self, X):
-        """Performs an augmented prediction of the top-K classes for the sample X 
+    def __predict_with_context_by_voting_1dim(self, X):
+        """Performs an augmented prediction of the top-K classes for sample X 
         
         Parameters:
         X:  ndarray of shape (n_features,) consisting of n features identified for X. 
 
-        Returns
+        Returns:
         topK: list of the top-K classes predicted for X.
 
         """
@@ -323,13 +456,16 @@ class xSVMC(SVC):
         cs = self.classes_
         k = self.k
         
-        ifselements = self.decision_function_with_context(X)
+        ifselements = self.__decision_function_with_context_1dim(X)
 
         if len(cs)==2:
-            if ifselements[0].buoyancy > 0: 
-                return [xPrediction(cs[1],ifselements[0])]
+            ifs_elem = ifselements[0]
+            eta = max(1, ifs_elem.mu_hat.value + ifs_elem.nu_hat.value)
+            ifs_elem = ifs_elem.normalize(eta)
+            if ifs_elem.buoyancy > 0: 
+                return [xPrediction(cs[1],ifs_elem)]
             else:
-                return [xPrediction(cs[0],ifselements[0])]
+                return [xPrediction(cs[0],ifs_elem)]
 
         votes = [0 for c in range(len(cs))]
         evals = [xAIFSElement() for c in range(len(cs))]
@@ -382,10 +518,158 @@ class xSVMC(SVC):
 
         # Return collection of xPrediction
         topK = [xPrediction(cs[t[0]],t[2]) for t in sorted_classes[0:k]]
+       
+        # For comparison with __predict_with_context_by_voting_ndim 
+        # (N.B. #votes can be equal and sorting results can be different)
+        # topK = [(xPrediction(cs[t[0]],t[2]),t[1] ) for t in sorted_classes[0:k]] 
         return topK
 
+    def __predict_with_context_by_voting_ndim(self, X):
+        """Performs an augmented prediction of the top-K classes for each sample in X. 
+        
+        Parameters:
+        X:  ndarray of shape (n_samples, n_features). 
 
-    def evaluate_all_memberships(self, X):
+        Returns
+        topK: ndarray of shape (n_samples, k) consisting of the top-K classes predicted for each sample in X. 
+
+        """
+        
+        if not hasattr(self, "classes_"):
+            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.")
+
+        if not isinstance(X,np.ndarray):
+            raise ValueError("X parameter must be an ndarray")
+
+        cs = self.classes_
+        n_classes = len(cs)
+        k = self.k
+        
+        memberships, nonmemberships, membership_misvs, nonmembership_misvs = self.decision_function_with_context(X)
+
+        n_samples = memberships.shape[0]
+
+        if n_classes==2:
+            buoyancy = memberships - nonmemberships
+            eta = np.max(memberships + nonmemberships, axis=1)
+            eta = np.where(eta>1.0, eta, 1.0)
+            ret = np.full(shape=(n_samples,1),fill_value=None)
+            for i in range(n_samples):
+                membershipAAD = xAAD(memberships[i][0], membership_misvs[i][0])
+                nonmembershipAAD = xAAD(nonmemberships[i][0], nonmembership_misvs[i][0])
+                ifsElem = xAIFSElement(membershipAAD, nonmembershipAAD)
+                ifsElem = ifsElem.normalize(eta[i])
+                if buoyancy[i][0] > 0: 
+                   prediction = xPrediction(cs[1], ifsElem)
+                else:
+                   prediction = xPrediction(cs[0], ifsElem)
+
+                ret[i] = prediction
+            return ret
+    
+
+        votes_per_class = np.zeros(shape=(n_samples,n_classes),dtype=int)
+        memberships_per_class = np.zeros(shape=(n_samples,n_classes))
+        nonmemberships_per_class = np.zeros(shape=(n_samples,n_classes))
+        membershipMISVs_per_class = np.full(shape=(n_samples,n_classes),fill_value=-1, dtype=int)
+        nonmembershipMISVs_per_class = np.full(shape=(n_samples,n_classes),fill_value=-1, dtype=int)
+        max_membership_per_class = np.zeros(shape=(n_samples,n_classes))
+        max_nonmembership_per_class = np.zeros(shape=(n_samples,n_classes))
+
+        buoyancy = memberships - nonmemberships
+        pro_i = np.greater(buoyancy,0)
+        pro_j = np.less(buoyancy,0)
+
+
+        p = 0
+        for i in range(len(cs)):
+            for j in range(i+1,len(cs)):
+                # counting
+                votes_per_class[:,i] += np.where(pro_i[:,p],1,0)
+                votes_per_class[:,j] += np.where(pro_j[:,p],1,0)
+       
+                # # pro_i 
+                memberships_per_class[:,i] += memberships[:,p]
+                nonmemberships_per_class[:,i] += nonmemberships[:,p]
+
+                # # pro_j
+                memberships_per_class[:,j] += nonmemberships[:,p]
+                nonmemberships_per_class[:,j] += memberships[:,p]
+
+                # # Obtain MISVs per class
+                cond = memberships[:, p] >=  max_membership_per_class[:,i]
+                max_membership_per_class[:,i] = np.where(cond, memberships[:, p], max_membership_per_class[:,i] )
+                membershipMISVs_per_class[:,i] = np.where(cond, membership_misvs[:, p], membershipMISVs_per_class[:,i] )
+                
+                cond = nonmemberships[:, p] >= max_nonmembership_per_class[:,i]
+                max_nonmembership_per_class[:,i] = np.where(cond, nonmemberships[:, p], max_nonmembership_per_class[:,i] )
+                nonmembershipMISVs_per_class[:,i] = np.where(cond, nonmembership_misvs[:, p], nonmembershipMISVs_per_class[:,i])
+
+                cond = memberships[:, p] >= max_nonmembership_per_class[:,j]
+                max_nonmembership_per_class[:,j] = np.where(cond, memberships[:, p],  max_nonmembership_per_class[:,j] )
+                nonmembershipMISVs_per_class[:,j] = np.where(cond, membership_misvs[:, p], nonmembershipMISVs_per_class[:,j], )
+
+
+                cond = nonmemberships[:, p] >= max_membership_per_class[:,j]
+                max_membership_per_class[:,j] = np.where(cond, nonmemberships[:, p], max_membership_per_class[:,j] )
+                membershipMISVs_per_class[:,j] = np.where(cond, nonmembership_misvs[:, p], membershipMISVs_per_class[:,j])
+                                  
+                p+=1
+
+
+        eta = np.max(memberships_per_class + nonmemberships_per_class, axis=1)
+        eta = np.where(eta>1.0, eta, 1.0)
+
+
+        # best_classes = np.argmax(votes_per_class,axis=1)
+        sorted_idx = np.argsort(votes_per_class, axis=1)
+        sorted_idx_desc = np.flip(sorted_idx, axis=1)
+        k_best_idx = sorted_idx_desc[:,:k]
+
+        ret = np.full(shape=(n_samples,k),fill_value=None)
+        for i in range(n_samples):
+            for ik, j in enumerate(k_best_idx[i]):
+                membershipAAD = xAAD(memberships_per_class[i,j], membershipMISVs_per_class[i,j])
+                nonmembershipAAD = xAAD(nonmemberships_per_class[i,j], nonmembershipMISVs_per_class[i,j])
+                ifsElem = xAIFSElement(membershipAAD, nonmembershipAAD)
+                ifsElem = ifsElem.normalize(eta[i])
+                prediction = xPrediction(cs[j], ifsElem)
+                ret[i,ik] = prediction
+
+        return ret
+
+   
+
+    def predict_with_context_by_voting(self, X):
+        """Performs an augmented prediction of the top-K classes for each sample in X.
+
+        
+        Parameters:
+        X: ndarray of shape (n_samples, n_features); or
+           ndarray of shape (n_features,) consisting of n features identified for sample X. 
+        
+        Returns:
+        topK: ndarray of shape (n_samples, k) consisting of the top-K classes predicted for each sample in X; or
+              list of the top-K classes predicted for X.
+
+        """
+        
+        if not hasattr(self, "classes_"):
+            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.")
+
+        if isinstance(X,np.ndarray):
+            if X.ndim == 1:
+                return self.__predict_with_context_by_voting_1dim(X)
+            else:
+                return self.__predict_with_context_by_voting_ndim(X)
+        elif isinstance(X, list):
+            return self.__predict_with_context_by_voting_ndim(np.array(X))
+        else:
+            raise ValueError("X parameter must be an ndarray")
+
+
+
+    def __evaluate_all_memberships_1dim(self, X):
         """Performs augmented evaluation of the proposition 'X IS A' for each class A learned during the training process.
         
         Parameters:
@@ -400,11 +684,14 @@ class xSVMC(SVC):
 
         cs = self.classes_
         
-        ifselements = self.decision_function_with_context(X)
-
+        ifselements = self.__decision_function_with_context_1dim(X)
+      
         if len(cs)==2:
             eta = max(1,ifselements[0].mu_hat.value + ifselements[0].nu_hat.value)
-            return [ifselements[0].normalize(eta)]
+            ifs_elem = ifselements[0]
+            ifs_elem = ifs_elem.normalize(eta)
+            opposite = xAIFSElement(ifs_elem.nu_hat, ifs_elem.mu_hat)
+            return [ifs_elem, opposite]
 
         evals = [xAIFSElement() for c in range(len(cs))]
         misvs = [xAIFSElement() for c in range(len(cs))]
@@ -451,25 +738,135 @@ class xSVMC(SVC):
 
         return evals
 
+    def __evaluate_all_memberships_ndim(self, X):
+        """Performs augmented evaluation of the proposition 'X IS A' for each class A learned during the training process.
+        
+        Parameters:
+        X:  ndarray of shape (n_samples, n_features). 
+
+        Returns:
+        arr : ndarray of shape (n_samples, n_classes) consisting of the augmented evaluations.
+        """
+        if not hasattr(self, "classes_"):
+            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this method.")
+
+        if not isinstance(X,np.ndarray):
+            raise ValueError("X parameter must be an ndarray")
+
+        cs = self.classes_
+        n_classes = len(cs)
+        
+        memberships, nonmemberships, membership_misvs, nonmembership_misvs = self.decision_function_with_context(X)
+
+        n_samples = memberships.shape[0]
+        
+        memberships_per_class = np.zeros(shape=(n_samples,n_classes))
+        nonmemberships_per_class = np.zeros(shape=(n_samples,n_classes))
+        membershipMISVs_per_class = np.full(shape=(n_samples,n_classes),fill_value=-1, dtype=int)
+        nonmembershipMISVs_per_class = np.full(shape=(n_samples,n_classes),fill_value=-1, dtype=int)
+        max_membership_per_class = np.zeros(shape=(n_samples,n_classes))
+        max_nonmembership_per_class = np.zeros(shape=(n_samples,n_classes))
+
+        p = 0
+        for i in range(len(cs)):
+            for j in range(i+1,len(cs)):
+                # pro_i 
+                memberships_per_class[:,i] += memberships[:,p]
+                nonmemberships_per_class[:,i] += nonmemberships[:,p]
+
+                # pro_j
+                memberships_per_class[:,j] += nonmemberships[:,p]
+                nonmemberships_per_class[:,j] += memberships[:,p]
+
+                # MISVs per class
+                cond = memberships[:, p] >=  max_membership_per_class[:,i]
+                max_membership_per_class[:,i] = np.where(cond, memberships[:, p], max_membership_per_class[:,i] )
+                membershipMISVs_per_class[:,i] = np.where(cond, membership_misvs[:, p], membershipMISVs_per_class[:,i] )
+               
+                cond = nonmemberships[:, p] >= max_nonmembership_per_class[:,i]
+                max_nonmembership_per_class[:,i] = np.where(cond, nonmemberships[:, p], max_nonmembership_per_class[:,i] )
+                nonmembershipMISVs_per_class[:,i] = np.where(cond, nonmembership_misvs[:, p], nonmembershipMISVs_per_class[:,i])
+
+                cond = memberships[:, p] >= max_nonmembership_per_class[:,j]
+                max_nonmembership_per_class[:,j] = np.where(cond, memberships[:, p],  max_nonmembership_per_class[:,j] )
+                nonmembershipMISVs_per_class[:,j] = np.where(cond, membership_misvs[:, p], nonmembershipMISVs_per_class[:,j], )
+
+                cond = nonmemberships[:, p] >= max_membership_per_class[:,j]
+                max_membership_per_class[:,j] = np.where(cond, nonmemberships[:, p], max_membership_per_class[:,j] )
+                membershipMISVs_per_class[:,j] = np.where(cond, nonmembership_misvs[:, p], membershipMISVs_per_class[:,j])
+              
+                p+=1
+
+
+        eta = np.max(memberships_per_class + nonmemberships_per_class, axis=1)
+        eta = np.where(eta>1.0, eta, 1.0)
+
+        ret = np.full(shape=(n_samples,n_classes),fill_value=None)
+        for i in range(n_samples):
+            for j in range(n_classes):
+                membershipAAD = xAAD(memberships_per_class[i,j], membershipMISVs_per_class[i,j])
+                nonmembershipAAD = xAAD(nonmemberships_per_class[i,j], nonmembershipMISVs_per_class[i,j])
+                ifsElem = xAIFSElement(membershipAAD, nonmembershipAAD)
+                ifsElem = ifsElem.normalize(eta[i])
+                ret[i,j] = ifsElem
+
+        return ret
+
+
+
+    def evaluate_all_memberships(self, X):
+        """Performs augmented evaluation of the proposition 'X IS A' for each class A learned during the training process
+        for each sample in X.
+        
+        Parameters:
+        X:  ndarray of shape (n_samples, n_features); or
+            ndarray of shape (n_features,). 
+
+        Returns:
+        arr : ndarray of shape (n_samples, n_classes) consisting of the augmented evaluations.
+        """
+        if isinstance(X,np.ndarray):
+            if X.ndim == 1:
+                return self.__evaluate_all_memberships_1dim(X)
+            else:
+                return self.__evaluate_all_memberships_ndim(X)
+        elif isinstance(X, list):
+            return self.__evaluate_all_memberships_ndim(np.array(X))
+        else:
+            raise ValueError("X parameter must be an ndarray")
+
+
 
     def  is_member_of(self, X, class_idx):
         """Performs an augmented evaluation of 'X IS A', where A is the class referenced by class_idx
+        for each sample in X.
         
         Parameters
-        X:  ndarray of shape (n_features,) consisting of n features identified for X. 
+        X:  ndarray of shape (n_samples, n_features); or
+            ndarray of shape (n_features,)
+
         class_idx: class index
 
         Returns
-        elem : Augmented IFSElement representing the augmented evaluation of 'X IS A'.
+        evals : ndarray of shape (n_samples) consisting of the augmented evaluations.
         """
 
         evals = self.evaluate_all_memberships(X)
+
+        if isinstance(X,np.ndarray):
+            if X.ndim == 1:
+                return evals[class_idx]
+            else:
+                return evals[:, class_idx]
+        elif isinstance(X, list):
+            return evals[class_idx]
+        else:
+            raise ValueError("X parameter must be an ndarray")
         
-        return evals[class_idx]
 
 
     
-    def predict_with_context(self, X):
+    def __predict_with_context_1dim(self, X):
         """Performs an augmented prediction of the top-K classes for X 
         
         Parameters
@@ -496,3 +893,70 @@ class xSVMC(SVC):
         # Return collection of xPrediction
         topK = [xPrediction(cs[t[0]],t[1]) for t in sorted_classes[0:k]]
         return topK
+
+
+    def __predict_with_context_ndim(self, X):
+        """Performs an augmented prediction of the top-K classes for each sample in X 
+        
+        Parameters
+        X :  ndarray of shape (n_samples, n_features). 
+
+        Returns
+        topK : ndarray of shape (n_samples, k) consisting of the top-K classes predicted for X.
+
+        """
+        if not hasattr(self, "classes_"):
+            raise Exception("This xSVMC instance is not fitted yet. Call 'fit' with appropriate arguments before using this method.")
+
+        if not isinstance(X,np.ndarray):
+            raise ValueError("X parameter must be an ndarray")
+
+        cs = self.classes_
+        n_classes = len(cs)
+        k = self.k
+        n_samples = X.shape[0]
+
+        evals = self.evaluate_all_memberships(X)
+
+        if len(cs)==2:
+            ret = np.full(shape=(n_samples,1),fill_value=None)
+            for i in range(n_samples):
+                evals_per_sample = evals[i]
+                if evals_per_sample[0].buoyancy > 0: 
+                    ret[i,:] = np.array([xPrediction(cs[1],evals_per_sample[0])])
+                else:
+                    ret[i,:] = np.array([xPrediction(cs[0],evals_per_sample[0])])
+            return ret
+        
+
+        indices_classes =  [c for c in range(len(cs))]  
+        ret = np.full(shape=(n_samples,k),fill_value=None)
+        for i in range(n_samples):
+            evals_per_sample = evals[i]
+            sorted_classes = list(zip(indices_classes, evals_per_sample))
+            sorted_classes.sort(key=self.__sort_buoyancy,reverse=True)
+            topK = [xPrediction(cs[t[0]],t[1]) for t in sorted_classes[0:k]]
+            ret[i,:] = np.array(topK)
+
+        return ret
+
+    def predict_with_context(self, X):
+        """Performs an augmented prediction of the top-K classes for each sample in X 
+        
+        Parameters
+        X :  ndarray of shape (n_samples, n_features), or
+             ndarray of shape (n_features)
+
+        Returns
+        topK : ndarray of shape (n_samples, k) consisting of the top-K classes predicted for X.
+
+        """
+        if isinstance(X,np.ndarray):
+            if X.ndim == 1:
+                return self.__predict_with_context_1dim(X)
+            else:
+                return self.__predict_with_context_ndim(X)
+        elif isinstance(X, list):
+            return self.__predict_with_context_ndim(np.array(X))
+        else:
+            raise ValueError("X parameter must be an ndarray")

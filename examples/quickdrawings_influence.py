@@ -102,7 +102,7 @@ def run_example():
         object_gradients = get_imgWithInfluence(object, raster_sz=RASTER_SZ, ret_img_sz = 128, bg_color=BG_COLOR)
            
     # Contextualized evaluation process
-        topK = clf.predict_with_context(x)
+        topK = clf.predict_with_context([x])[0]
 
         plot_ctr = 1
         for position in range(k):

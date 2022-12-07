@@ -114,7 +114,7 @@ def run_example(output_dir, get_article):
 
     x = X_test[idx_obj]
 # Contextualized evaluation process
-    topK = clf.predict_with_context(x)
+    topK = clf.predict_with_context([x])[0]
     position = 0
     prediction = topK[position]
     idx_proMISV = ref_SVs[prediction.eval.membership.reason]

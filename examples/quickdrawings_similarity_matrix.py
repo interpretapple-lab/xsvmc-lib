@@ -107,9 +107,9 @@ def run_example(output_dir, get_article):
     clf.fit(X_train, y_train.ravel())
 
 #  A few objects can be used for building an AIFS
-    X_test2 = X_test[0:20]
+    X_test2 = X_test[0:100]
     print("Evaluating memberships...")
-    all_memberships_evals = [clf.evaluate_all_memberships(o) for o in X_test2]
+    all_memberships_evals = clf.evaluate_all_memberships(X_test2) 
 
     n_cats = len(categories)
     sims = np.zeros((n_cats, n_cats))

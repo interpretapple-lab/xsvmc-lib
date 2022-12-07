@@ -87,9 +87,8 @@ def run_example():
     print("Learning...")
     clf.fit(X_train, y_train.ravel())
 
-    X_test2 = X_test[0:20]
     print("Evaluating memberships...")
-    all_memberships_evals = [clf.evaluate_all_memberships(o) for o in X_test]
+    all_memberships_evals = clf.evaluate_all_memberships(X_test)
 
     n_cats = len(categories)
     sims = np.zeros((n_cats, n_cats))

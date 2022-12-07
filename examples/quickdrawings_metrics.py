@@ -88,15 +88,16 @@ def run_metrics():
     
 
     # ---- Evaluation process: Begin --- 
-    from multiprocessing import Pool as ThreadPool
-
     print("Evaluating {0} objects...".format(len(y_test)))
-    NUMBER_OF_PROCESSES = 16
+    # from multiprocessing import Pool as ThreadPool
+    # NUMBER_OF_PROCESSES = 16
     
-    pool = ThreadPool(NUMBER_OF_PROCESSES)
-    ctx_predictions = pool.map(clf.predict_with_context_by_voting, X_test)
-    pool.close()
-    pool.join()
+    # pool = ThreadPool(NUMBER_OF_PROCESSES)
+    # ctx_predictions = pool.map(clf.predict_with_context_by_voting, X_test)
+    # pool.close()
+    # pool.join()
+
+    ctx_predictions = clf.predict_with_context_by_voting(X_test)
 
      # ---- Evaluation process: End --- 
 
