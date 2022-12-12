@@ -25,6 +25,11 @@ Parts of the following datasets are used in several examples that illustrate the
 - [The Quick, Draw! Dataset](https://github.com/googlecreativelab/quickdraw-dataset)
 - [The MNIST database of handwritten digits](http://yann.lecun.com/exdb/mnist/)
 
+## Technical Information
+The mathematical foundation of *XSVMC-Lib* can be found in 
+
+M. Loor and G. De Tré, "[Contextualizing Support Vector Machine Predictions](https://doi.org/10.2991/ijcis.d.200910.002)," International Journal of Computational Intelligence Systems, Volume 13, Issue 1, 2020, Pages 1483 - 1497, doi: 10.2991/ijcis.d.200910.002.
+
 
 ## License
 *XSVMC-Lib* is released under the [Apache License, Version 2.0](LICENSE).
