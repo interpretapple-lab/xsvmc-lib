@@ -93,7 +93,10 @@ class xSVMC(SVC):
         elif self.kernel == 'poly':
             return ((params['gamma']*np.dot(V, X)) + params['coef0'])**params['degree']
         elif self.kernel == 'rbf':
-            return exp(-params['gamma'] * np.dot(V - X, V - X)) 
+            X = X.T
+            X_sqr = np.sum(X ** 2, axis = -1)
+            V_sqr = np.sum(V ** 2, axis = -1)
+            return np.exp(-params['gamma'] * (V_sqr[:,None] + X_sqr[None,:] - 2 * np.dot(V, X.T)))
         elif callable(self.kernel):
             return self.kernel(V, X) 
 
@@ -265,7 +268,8 @@ class xSVMC(SVC):
        
          
         p2 = 0
-        for i in range(n_classes):
+        # for i in range(n_classes):
+        for i in range(n_classes-1):
             for j in range(i+1,n_classes):
                  
                 part_class_i = weighted_vals[:,j-1,start[i]:end[i]]
@@ -336,7 +340,7 @@ class xSVMC(SVC):
             else:
                 return self.__decision_function_with_context_ndim(X)
         elif isinstance(X, list):
-            return self.__decision_function_with_context_ndim(np.array(X))
+            return self.decision_function_with_context(np.array(X))
         else:
             raise ValueError("X parameter must be an ndarray")
 
@@ -557,11 +561,14 @@ class xSVMC(SVC):
             for i in range(n_samples):
                 membershipAAD = xAAD(memberships[i][0], membership_misvs[i][0])
                 nonmembershipAAD = xAAD(nonmemberships[i][0], nonmembership_misvs[i][0])
-                ifsElem = xAIFSElement(membershipAAD, nonmembershipAAD)
-                ifsElem = ifsElem.normalize(eta[i])
+                
                 if buoyancy[i][0] > 0: 
+                   ifsElem = xAIFSElement(membershipAAD, nonmembershipAAD)  # Assign the membership level according the prediction
+                   ifsElem = ifsElem.normalize(eta[i])
                    prediction = xPrediction(cs[1], ifsElem)
                 else:
+                   ifsElem = xAIFSElement(nonmembershipAAD, membershipAAD) # Assign the membership level according the prediction
+                   ifsElem = ifsElem.normalize(eta[i])
                    prediction = xPrediction(cs[0], ifsElem)
 
                 ret[i] = prediction
@@ -626,6 +633,8 @@ class xSVMC(SVC):
         sorted_idx_desc = np.flip(sorted_idx, axis=1)
         k_best_idx = sorted_idx_desc[:,:k]
 
+        # print(f"\n======= votes {votes_per_class} idx: {sorted_idx_desc} k_best_idx: {k_best_idx} cs: {[cs[i] for i in k_best_idx]}")
+
         ret = np.full(shape=(n_samples,k),fill_value=None)
         for i in range(n_samples):
             for ik, j in enumerate(k_best_idx[i]):
@@ -663,7 +672,7 @@ class xSVMC(SVC):
             else:
                 return self.__predict_with_context_by_voting_ndim(X)
         elif isinstance(X, list):
-            return self.__predict_with_context_by_voting_ndim(np.array(X))
+            return self.predict_with_context_by_voting(np.array(X))
         else:
             raise ValueError("X parameter must be an ndarray")
 
@@ -831,7 +840,7 @@ class xSVMC(SVC):
             else:
                 return self.__evaluate_all_memberships_ndim(X)
         elif isinstance(X, list):
-            return self.__evaluate_all_memberships_ndim(np.array(X))
+            return self.evaluate_all_memberships(np.array(X))
         else:
             raise ValueError("X parameter must be an ndarray")
 
@@ -922,10 +931,11 @@ class xSVMC(SVC):
             ret = np.full(shape=(n_samples,1),fill_value=None)
             for i in range(n_samples):
                 evals_per_sample = evals[i]
-                if evals_per_sample[0].buoyancy > 0: 
-                    ret[i,:] = np.array([xPrediction(cs[1],evals_per_sample[0])])
+                idx_membership, idx_nonmembership = 0, 1
+                if evals_per_sample[idx_membership].buoyancy > 0: 
+                    ret[i,:] = np.array([xPrediction(cs[1],evals_per_sample[idx_membership])]) #
                 else:
-                    ret[i,:] = np.array([xPrediction(cs[0],evals_per_sample[0])])
+                    ret[i,:] = np.array([xPrediction(cs[0],evals_per_sample[idx_nonmembership])])
             return ret
         
 
@@ -957,6 +967,8 @@ class xSVMC(SVC):
             else:
                 return self.__predict_with_context_ndim(X)
         elif isinstance(X, list):
-            return self.__predict_with_context_ndim(np.array(X))
+            return self.predict_with_context(np.array(X))
         else:
             raise ValueError("X parameter must be an ndarray")
+
+    
